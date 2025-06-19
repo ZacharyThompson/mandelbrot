@@ -1,4 +1,4 @@
-module mandlebrot
+module mandelbrot
 
 go 1.24.4
 
