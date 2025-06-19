@@ -4,13 +4,24 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"sync"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	cf "github.com/lucasb-eyer/go-colorful"
 )
 
+type point struct {
+	x, y  int32
+	iters int32
+}
+
+type bounds struct {
+	xmin, xmax float32
+	ymin, ymax float32
+}
+
 func mandelBrotIters(x0 float32, y0 float32, maxIter int32) int32 {
-	const cutoff = 4
+	const cutoff = 64
 	var x, y, x2, y2 float32
 	var i int32
 	x = 0
@@ -26,36 +37,32 @@ func mandelBrotIters(x0 float32, y0 float32, maxIter int32) int32 {
 	return i
 }
 
-type point struct {
-	x, y  int32
-	iters int32
-}
-
-func getPoints(screenWidth int32, screenHeight int32, maxIter int32, c chan point) {
+func getPoints(screenWidth int32, screenHeight int32, maxIter int32, b bounds, c chan point) {
+	var wg sync.WaitGroup
 	for x := range screenWidth {
 		for y := range screenHeight {
-			scaled_x := (float32(x)/float32(screenWidth))*(0.47-(-2.0)) + (-2)
-			scaled_y := (float32(y)/float32(screenHeight))*(1.12-(-1.12)) + (-1.12)
-			c <- point{x, y, mandelBrotIters(scaled_x, scaled_y, maxIter)}
+			wg.Add(1)
+			go func(wg *sync.WaitGroup) {
+				defer wg.Done()
+				scaled_x := (float32(x)/float32(screenWidth))*(b.xmax-(b.xmin)) + (b.xmin)
+				scaled_y := (float32(y)/float32(screenHeight))*(b.ymax-(b.ymin)) + (b.ymin)
+				c <- point{x, y, mandelBrotIters(scaled_x, scaled_y, maxIter)}
+			}(&wg)
 		}
 	}
+	wg.Wait()
 	close(c)
 }
 
-func drawMandelBrot() rl.Texture2D {
+func drawMandelBrot(b bounds, texture rl.Texture2D) {
 	screenWidth := rl.GetScreenWidth()
 	screenHeight := rl.GetScreenHeight()
 
-	img := rl.GenImageColor(screenWidth, screenHeight, color.RGBA{0, 0, 0, 0})
-	if !rl.IsImageValid(img) {
-		log.Fatalf("Invalid image")
-	}
-	defer rl.UnloadImage(img)
-
+	data := make([]color.RGBA, screenHeight*screenWidth)
 	var maxIter int32
 	maxIter = 1000
 	c := make(chan point, screenHeight*screenWidth)
-	go getPoints(int32(screenWidth), int32(screenHeight), maxIter, c)
+	go getPoints(int32(screenWidth), int32(screenHeight), maxIter, b, c)
 	for p := range c {
 		var pointColor color.RGBA
 		if p.iters == maxIter {
@@ -75,14 +82,10 @@ func drawMandelBrot() rl.Texture2D {
 			pointColor.B = uint8(b)
 			pointColor.A = uint8(a)
 		}
-		rl.ImageDrawPixel(img, p.x, p.y, pointColor)
+		data[int32(screenWidth)*p.y+p.x] = pointColor
 	}
 
-	texture := rl.LoadTextureFromImage(img)
-	if !rl.IsTextureValid(texture) {
-		log.Fatalf("Invalid texture")
-	}
-	return texture
+	rl.UpdateTexture(texture, data)
 }
 
 func main() {
@@ -93,17 +96,86 @@ func main() {
 
 	rl.SetTargetFPS(120)
 
-	m := drawMandelBrot()
+	originalBounds := bounds{-2, 1, -1, 1}
+	lastBounds := originalBounds
+	currentBounds := originalBounds
+	boundsChanged := false
+
+	selectionMode := false
+
+	img := rl.LoadImageFromScreen()
+	if !rl.IsImageValid(img) {
+		log.Fatal("invalid image")
+	}
+	rl.ImageClearBackground(img, rl.White)
+	texture := rl.LoadTextureFromImage(img)
+	if !rl.IsTextureValid(texture) {
+		log.Fatal("invalid texture")
+	}
+	rl.UnloadImage(img)
+
+	var mousePos rl.Vector2
+	drawMandelBrot(currentBounds, texture)
 	for !rl.WindowShouldClose() {
+
+		if rl.IsMouseButtonDown(rl.MouseLeftButton) && !selectionMode {
+			selectionMode = true
+			mousePos = rl.GetMousePosition()
+		}
+
+		if rl.IsMouseButtonUp(rl.MouseLeftButton) {
+			selectionMode = false
+		}
+
+		if rl.IsKeyPressed(rl.KeyEqual) {
+			currentBounds = originalBounds
+		}
+
+		if rl.IsKeyPressed(rl.KeyA) {
+			currentBounds = bounds{-5, 5, -1, 1}
+		}
+
+		boundsChanged = currentBounds != lastBounds
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 		if rl.IsWindowResized() {
-			rl.UnloadTexture(m)
-			m = drawMandelBrot()
+			rl.UnloadTexture(texture)
+			img := rl.LoadImageFromScreen()
+			if !rl.IsImageValid(img) {
+				log.Fatal("invalid image")
+			}
+			rl.ImageClearBackground(img, rl.White)
+			texture = rl.LoadTextureFromImage(img)
+			if !rl.IsTextureValid(texture) {
+				log.Fatal("invalid texture")
+			}
+			drawMandelBrot(currentBounds, texture)
+			rl.UnloadImage(img)
 		}
-		rl.DrawTexture(m, 0, 0, rl.White)
+		if boundsChanged {
+			// rl.UnloadTexture(m)
+			drawMandelBrot(currentBounds, texture)
+			lastBounds = currentBounds
+			boundsChanged = false
+		}
+		rl.DrawTexture(texture, 0, 0, rl.White)
+
+		if selectionMode {
+			currentPos := rl.GetMousePosition()
+			screenSize := rl.Vector2{X: float32(rl.GetScreenWidth()), Y: float32(rl.GetScreenHeight())}
+			aspect := rl.Vector2Normalize(screenSize)
+			diff := rl.Vector2Subtract(currentPos, mousePos)
+			length := float32(math.Sqrt(float64(diff.X*diff.X + diff.Y*diff.Y)))
+			size := rl.Vector2Scale(aspect, length)
+			posX := int32(mousePos.X)
+			posY := int32(mousePos.Y)
+			width := int32(size.X)
+			height := int32(size.Y)
+			rl.DrawRectangleLines(posX, posY, width, height, rl.Red)
+		}
+
 		rl.DrawFPS(0, 0)
 		rl.EndDrawing()
 	}
-	rl.UnloadTexture(m)
+	rl.UnloadTexture(texture)
 }
