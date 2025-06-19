@@ -81,12 +81,12 @@ func main() {
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
-		rl.DrawFPS(0, 0)
 		if rl.IsWindowResized() {
 			rl.UnloadTexture(m)
 			m = drawMandelBrot()
 		}
 		rl.DrawTexture(m, 0, 0, rl.White)
+		rl.DrawFPS(0, 0)
 		rl.EndDrawing()
 	}
 	rl.UnloadTexture(m)
