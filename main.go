@@ -3,48 +3,38 @@ package main
 import (
 	"image/color"
 	"log"
-	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-//	func mandelBrotIters(z complex128) int {
-//		const cutoff = 400
-//		const max_iter = 1000
-//		const c = 0 + 0i
-//		var i int
-//		for i = 0; i < iterations && cmplx.Abs(z) <= cutoff; i++ {
-//			z = (z * z) + c
-//		}
-//		return cmplx.Abs(z) <= cutoff
-//	}
-func absSquare(z complex128) float64 {
-	return math.Pow(real(z), 2) + math.Pow(imag(z), 2)
+func absSquare(z complex64) float32 {
+	return real(z)*real(z) + imag(z)*imag(z)
 }
 
-func inMandelbrotSet(z complex128) bool {
+func mandelBrotIters(z complex64) int32 {
 	const cutoff = 4
-	const iterations = 100
+	const maxIter = 50
 	c := z
-	for i := 0; i < iterations && absSquare(z) <= cutoff; i++ {
+	var i int32
+	for i = 0; i < maxIter && absSquare(z) <= cutoff; i++ {
 		z = (z * z) + c
 	}
-	return absSquare(z) <= cutoff
+	return i
 }
 
 type point struct {
-	x, y int
+	x, y  int32
+	iters int32
 }
 
-func getPoints(screenWidth int, screenHeight int, c chan point) {
+func getPoints(screenWidth int32, screenHeight int32, c chan point) {
 	for x := range screenWidth {
 		for y := range screenHeight {
-			scaled_x := (float64(x)/float64(screenWidth))*(0.47-(-2.0)) + (-2)
-			scaled_y := (float64(y)/float64(screenHeight))*(1.12-(-1.12)) + (-1.12)
-			z := complex(scaled_x, scaled_y)
-			if inMandelbrotSet(z) {
-				c <- point{x, y}
-			}
+			scaled_x := (float32(x)/float32(screenWidth))*(0.47-(-2.0)) + (-2)
+			scaled_y := (float32(y)/float32(screenHeight))*(1.12-(-1.12)) + (-1.12)
+			var z complex64
+			z = complex(scaled_x, scaled_y)
+			c <- point{x, y, mandelBrotIters(z)}
 		}
 	}
 	close(c)
@@ -60,9 +50,16 @@ func drawMandelBrot() rl.Texture2D {
 	}
 	defer rl.UnloadImage(img)
 	c := make(chan point, screenHeight*screenWidth)
-	go getPoints(screenWidth, screenHeight, c)
+	go getPoints(int32(screenWidth), int32(screenHeight), c)
 	for p := range c {
-		rl.ImageDrawPixel(img, int32(p.x), int32(p.y), rl.Black)
+		hue := 360.0 * (float32(p.iters) / 50)
+		var value float32
+		value = 1.0
+		if p.iters == 50 {
+			value = 0
+		}
+		pointColor := rl.ColorFromHSV(hue, 1.0, value)
+		rl.ImageDrawPixel(img, p.x, p.y, pointColor)
 	}
 
 	texture := rl.LoadTextureFromImage(img)
@@ -82,8 +79,6 @@ func main() {
 
 	m := drawMandelBrot()
 	for !rl.WindowShouldClose() {
-		// screenSize := rl.Vector2{X: float32(rl.GetScreenWidth()), Y: float32(rl.GetScreenHeight())}
-		// origin := rl.Vector2Scale(screenSize, 0.5)
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 		rl.DrawFPS(0, 0)
@@ -92,7 +87,6 @@ func main() {
 			m = drawMandelBrot()
 		}
 		rl.DrawTexture(m, 0, 0, rl.White)
-
 		rl.EndDrawing()
 	}
 	rl.UnloadTexture(m)
