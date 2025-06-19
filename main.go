@@ -20,6 +20,10 @@ type bounds struct {
 	ymin, ymax float32
 }
 
+func scaleCoordinate(screenCoord, screenMax, boundMax, boundMin float32) float32 {
+	return (screenCoord/screenMax)*(boundMax-(boundMin)) + (boundMin)
+}
+
 func mandelBrotIters(x0 float32, y0 float32, maxIter int32) int32 {
 	const cutoff = 64
 	var x, y, x2, y2 float32
@@ -44,8 +48,8 @@ func getPoints(screenWidth int32, screenHeight int32, maxIter int32, b bounds, c
 			wg.Add(1)
 			go func(wg *sync.WaitGroup) {
 				defer wg.Done()
-				scaled_x := (float32(x)/float32(screenWidth))*(b.xmax-(b.xmin)) + (b.xmin)
-				scaled_y := (float32(y)/float32(screenHeight))*(b.ymax-(b.ymin)) + (b.ymin)
+				scaled_x := scaleCoordinate(float32(x), float32(screenWidth), b.xmax, b.xmin)
+				scaled_y := scaleCoordinate(float32(y), float32(screenHeight), b.ymax, b.ymin)
 				c <- point{x, y, mandelBrotIters(scaled_x, scaled_y, maxIter)}
 			}(&wg)
 		}
@@ -99,6 +103,7 @@ func main() {
 	originalBounds := bounds{-2, 1, -1, 1}
 	lastBounds := originalBounds
 	currentBounds := originalBounds
+	selectedBounds := originalBounds
 	boundsChanged := false
 
 	selectionMode := false
@@ -125,6 +130,7 @@ func main() {
 
 		if rl.IsMouseButtonUp(rl.MouseLeftButton) {
 			selectionMode = false
+			currentBounds = selectedBounds
 		}
 
 		if rl.IsKeyPressed(rl.KeyEqual) {
@@ -172,6 +178,10 @@ func main() {
 			width := int32(size.X)
 			height := int32(size.Y)
 			rl.DrawRectangleLines(posX, posY, width, height, rl.Red)
+			selectedBounds.xmin = scaleCoordinate(float32(posX), screenSize.X, currentBounds.xmax, currentBounds.xmin)
+			selectedBounds.xmax = scaleCoordinate(float32(posX+width), screenSize.X, currentBounds.xmax, currentBounds.xmin)
+			selectedBounds.ymin = scaleCoordinate(float32(posY), screenSize.Y, currentBounds.ymax, currentBounds.ymin)
+			selectedBounds.ymax = scaleCoordinate(float32(posY+height), screenSize.Y, currentBounds.ymax, currentBounds.ymin)
 		}
 
 		rl.DrawFPS(0, 0)
