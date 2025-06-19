@@ -128,7 +128,7 @@ func main() {
 			mousePos = rl.GetMousePosition()
 		}
 
-		if rl.IsMouseButtonUp(rl.MouseLeftButton) {
+		if rl.IsMouseButtonReleased(rl.MouseLeftButton) {
 			selectionMode = false
 			currentBounds = selectedBounds
 		}
