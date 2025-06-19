@@ -75,7 +75,7 @@ func drawMandelBrot() rl.Texture2D {
 func main() {
 	rl.SetConfigFlags(rl.FlagWindowResizable)
 
-	rl.InitWindow(1920, 1080, "mandlebrot")
+	rl.InitWindow(1920, 1080, "Mandelbrot")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(120)
