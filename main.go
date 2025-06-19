@@ -3,21 +3,25 @@ package main
 import (
 	"image/color"
 	"log"
+	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+	cf "github.com/lucasb-eyer/go-colorful"
 )
 
-func absSquare(z complex64) float32 {
-	return real(z)*real(z) + imag(z)*imag(z)
-}
-
-func mandelBrotIters(z complex64) int32 {
+func mandelBrotIters(x0 float32, y0 float32, maxIter int32) int32 {
 	const cutoff = 4
-	const maxIter = 50
-	c := z
+	var x, y, x2, y2 float32
 	var i int32
-	for i = 0; i < maxIter && absSquare(z) <= cutoff; i++ {
-		z = (z * z) + c
+	x = 0
+	y = 0
+	x2 = 0
+	y2 = 0
+	for i = 0; x2+y2 <= cutoff && i < maxIter; i++ {
+		y = 2*x*y + y0
+		x = x2 - y2 + x0
+		x2 = x * x
+		y2 = y * y
 	}
 	return i
 }
@@ -27,14 +31,12 @@ type point struct {
 	iters int32
 }
 
-func getPoints(screenWidth int32, screenHeight int32, c chan point) {
+func getPoints(screenWidth int32, screenHeight int32, maxIter int32, c chan point) {
 	for x := range screenWidth {
 		for y := range screenHeight {
 			scaled_x := (float32(x)/float32(screenWidth))*(0.47-(-2.0)) + (-2)
 			scaled_y := (float32(y)/float32(screenHeight))*(1.12-(-1.12)) + (-1.12)
-			var z complex64
-			z = complex(scaled_x, scaled_y)
-			c <- point{x, y, mandelBrotIters(z)}
+			c <- point{x, y, mandelBrotIters(scaled_x, scaled_y, maxIter)}
 		}
 	}
 	close(c)
@@ -49,16 +51,30 @@ func drawMandelBrot() rl.Texture2D {
 		log.Fatalf("Invalid image")
 	}
 	defer rl.UnloadImage(img)
+
+	var maxIter int32
+	maxIter = 1000
 	c := make(chan point, screenHeight*screenWidth)
-	go getPoints(int32(screenWidth), int32(screenHeight), c)
+	go getPoints(int32(screenWidth), int32(screenHeight), maxIter, c)
 	for p := range c {
-		hue := 360.0 * (float32(p.iters) / 50)
-		var value float32
-		value = 1.0
-		if p.iters == 50 {
-			value = 0
+		var pointColor color.RGBA
+		if p.iters == maxIter {
+			pointColor = rl.Black
+		} else {
+			i := float64(p.iters)
+			maxI := float64(maxIter)
+			s := i / maxI
+			v := 1.0 - (math.Cos(math.Pi*s) * math.Cos(math.Pi*s))
+			L := 75 - (75 * v)
+			C := 28 + (75 - (75 * v))
+			H := math.Mod(math.Pow(360*s, 1.5), 360)
+			lch := cf.LuvLCh(L, C, H)
+			r, g, b, a := lch.RGBA()
+			pointColor.R = uint8(r)
+			pointColor.G = uint8(g)
+			pointColor.B = uint8(b)
+			pointColor.A = uint8(a)
 		}
-		pointColor := rl.ColorFromHSV(hue, 1.0, value)
 		rl.ImageDrawPixel(img, p.x, p.y, pointColor)
 	}
 
