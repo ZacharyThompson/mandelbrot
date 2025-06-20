@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"sync"
+	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	cf "github.com/lucasb-eyer/go-colorful"
@@ -59,6 +60,7 @@ func getPoints(screenWidth int32, screenHeight int32, maxIter int32, b bounds, c
 }
 
 func drawMandelBrot(enableColor bool, b bounds, texture rl.Texture2D) {
+	start := time.Now()
 	screenWidth := rl.GetScreenWidth()
 	screenHeight := rl.GetScreenHeight()
 
@@ -90,6 +92,7 @@ func drawMandelBrot(enableColor bool, b bounds, texture rl.Texture2D) {
 	}
 
 	rl.UpdateTexture(texture, data)
+	log.Println("Time to render: ", time.Since(start))
 }
 
 func main() {
