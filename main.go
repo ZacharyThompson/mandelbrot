@@ -16,17 +16,17 @@ type point struct {
 }
 
 type bounds struct {
-	xmin, xmax float32
-	ymin, ymax float32
+	xmin, xmax float64
+	ymin, ymax float64
 }
 
-func scaleCoordinate(screenCoord, screenMax, boundMax, boundMin float32) float32 {
+func scaleCoordinate(screenCoord, screenMax, boundMax, boundMin float64) float64 {
 	return (screenCoord/screenMax)*(boundMax-(boundMin)) + (boundMin)
 }
 
-func mandelBrotIters(x0 float32, y0 float32, maxIter int32) int32 {
+func mandelBrotIters(x0 float64, y0 float64, maxIter int32) int32 {
 	const cutoff = 64
-	var x, y, x2, y2 float32
+	var x, y, x2, y2 float64
 	var i int32
 	x = 0
 	y = 0
@@ -48,8 +48,8 @@ func getPoints(screenWidth int32, screenHeight int32, maxIter int32, b bounds, c
 			wg.Add(1)
 			go func(wg *sync.WaitGroup) {
 				defer wg.Done()
-				scaled_x := scaleCoordinate(float32(x), float32(screenWidth), b.xmax, b.xmin)
-				scaled_y := scaleCoordinate(float32(y), float32(screenHeight), b.ymax, b.ymin)
+				scaled_x := scaleCoordinate(float64(x), float64(screenWidth), b.xmax, b.xmin)
+				scaled_y := scaleCoordinate(float64(y), float64(screenHeight), b.ymax, b.ymin)
 				c <- point{x, y, mandelBrotIters(scaled_x, scaled_y, maxIter)}
 			}(&wg)
 		}
@@ -64,7 +64,7 @@ func drawMandelBrot(b bounds, texture rl.Texture2D) {
 
 	data := make([]color.RGBA, screenHeight*screenWidth)
 	var maxIter int32
-	maxIter = 1000
+	maxIter = 5000
 	c := make(chan point, screenHeight*screenWidth)
 	go getPoints(int32(screenWidth), int32(screenHeight), maxIter, b, c)
 	for p := range c {
@@ -178,10 +178,10 @@ func main() {
 			width := int32(size.X)
 			height := int32(size.Y)
 			rl.DrawRectangleLines(posX, posY, width, height, rl.Red)
-			selectedBounds.xmin = scaleCoordinate(float32(posX), screenSize.X, currentBounds.xmax, currentBounds.xmin)
-			selectedBounds.xmax = scaleCoordinate(float32(posX+width), screenSize.X, currentBounds.xmax, currentBounds.xmin)
-			selectedBounds.ymin = scaleCoordinate(float32(posY), screenSize.Y, currentBounds.ymax, currentBounds.ymin)
-			selectedBounds.ymax = scaleCoordinate(float32(posY+height), screenSize.Y, currentBounds.ymax, currentBounds.ymin)
+			selectedBounds.xmin = scaleCoordinate(float64(posX), float64(screenSize.X), currentBounds.xmax, currentBounds.xmin)
+			selectedBounds.xmax = scaleCoordinate(float64(posX+width), float64(screenSize.X), currentBounds.xmax, currentBounds.xmin)
+			selectedBounds.ymin = scaleCoordinate(float64(posY), float64(screenSize.Y), currentBounds.ymax, currentBounds.ymin)
+			selectedBounds.ymax = scaleCoordinate(float64(posY+height), float64(screenSize.Y), currentBounds.ymax, currentBounds.ymin)
 		}
 
 		rl.DrawFPS(0, 0)
