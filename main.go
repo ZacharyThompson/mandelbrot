@@ -58,7 +58,7 @@ func getPoints(screenWidth int32, screenHeight int32, maxIter int32, b bounds, c
 	close(c)
 }
 
-func drawMandelBrot(b bounds, texture rl.Texture2D) {
+func drawMandelBrot(enableColor bool, b bounds, texture rl.Texture2D) {
 	screenWidth := rl.GetScreenWidth()
 	screenHeight := rl.GetScreenHeight()
 
@@ -71,7 +71,7 @@ func drawMandelBrot(b bounds, texture rl.Texture2D) {
 		var pointColor color.RGBA
 		if p.iters == maxIter {
 			pointColor = rl.Black
-		} else {
+		} else if enableColor {
 			i := float64(p.iters)
 			maxI := float64(maxIter)
 			s := i / maxI
@@ -95,12 +95,12 @@ func drawMandelBrot(b bounds, texture rl.Texture2D) {
 func main() {
 	rl.SetConfigFlags(rl.FlagWindowResizable)
 
-	rl.InitWindow(1920, 1080, "Mandelbrot")
+	rl.InitWindow(1080, 1080, "Mandelbrot")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(120)
 
-	originalBounds := bounds{-2.2, 1, -1.2, 1.2}
+	originalBounds := bounds{-2.2, 2.2, -2.2, 2.2}
 	lastBounds := originalBounds
 	currentBounds := originalBounds
 	selectedBounds := originalBounds
@@ -119,8 +119,9 @@ func main() {
 	}
 	rl.UnloadImage(img)
 
+	enableColor := true
 	var mousePos rl.Vector2
-	drawMandelBrot(currentBounds, texture)
+	drawMandelBrot(enableColor, currentBounds, texture)
 	for !rl.WindowShouldClose() {
 
 		if rl.IsMouseButtonDown(rl.MouseLeftButton) && !selectionMode {
@@ -141,6 +142,11 @@ func main() {
 			currentBounds = bounds{-5, 5, -1, 1}
 		}
 
+		if rl.IsKeyPressed(rl.KeyC) {
+			enableColor = !enableColor
+			drawMandelBrot(enableColor, currentBounds, texture)
+		}
+
 		boundsChanged = currentBounds != lastBounds
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
@@ -155,12 +161,12 @@ func main() {
 			if !rl.IsTextureValid(texture) {
 				log.Fatal("invalid texture")
 			}
-			drawMandelBrot(currentBounds, texture)
+			drawMandelBrot(enableColor, currentBounds, texture)
 			rl.UnloadImage(img)
 		}
 		if boundsChanged {
 			// rl.UnloadTexture(m)
-			drawMandelBrot(currentBounds, texture)
+			drawMandelBrot(enableColor, currentBounds, texture)
 			lastBounds = currentBounds
 			boundsChanged = false
 		}
@@ -177,7 +183,7 @@ func main() {
 			posY := int32(mousePos.Y)
 			width := int32(size.X)
 			height := int32(size.Y)
-			rl.DrawRectangleLines(posX, posY, width, height, rl.Red)
+			rl.DrawRectangle(posX, posY, width, height, color.RGBA{0x00, 0xaa, 0xff, 0x88})
 			selectedBounds.xmin = scaleCoordinate(float64(posX), float64(screenSize.X), currentBounds.xmax, currentBounds.xmin)
 			selectedBounds.xmax = scaleCoordinate(float64(posX+width), float64(screenSize.X), currentBounds.xmax, currentBounds.xmin)
 			selectedBounds.ymin = scaleCoordinate(float64(posY), float64(screenSize.Y), currentBounds.ymax, currentBounds.ymin)
