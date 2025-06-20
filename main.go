@@ -100,7 +100,7 @@ func main() {
 
 	rl.SetTargetFPS(120)
 
-	originalBounds := bounds{-2, 1, -1, 1}
+	originalBounds := bounds{-2.2, 1, -1.2, 1.2}
 	lastBounds := originalBounds
 	currentBounds := originalBounds
 	selectedBounds := originalBounds
